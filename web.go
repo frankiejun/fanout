@@ -218,6 +218,10 @@ textarea:focus{outline:none;border-color:var(--accent)}
       <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       导出链接
     </button>
+    <button id="exportSocks" title="导出所有出口的 SOCKS5 代理地址">
+      <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      导出 SOCKS5
+    </button>
     <button id="stopall" title="停止所有出口">
       <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
       全部停止
@@ -414,7 +418,7 @@ textarea:focus{outline:none;border-color:var(--accent)}
 <div class="modal" id="export">
   <div class="sheet">
     <div class="head">
-      <h2>节点链接</h2>
+      <h2 id="extitle">节点链接</h2>
       <span class="count" id="excount"></span>
       <span class="spacer"></span>
       <button id="copyall">
@@ -557,6 +561,7 @@ function renderExits(){
   const n = view.exits.length;
   $('#ecount').textContent = n ? n + ' 个' : '';
   $('#exportAll').disabled = !view.exits.some(e => e.inbounds && e.inbounds.length);
+  $('#exportSocks').disabled = !view.exits.some(e => e.status === 'up');
   $('#stopall').disabled = !n;
 
   if(!n){
@@ -1161,6 +1166,7 @@ $('#crsave').onclick = async e => {
 
 // ---- 导出 ----
 $('#exportAll').onclick = async () => {
+  $('#extitle').textContent = '节点链接';
   const ids = view.exits.flatMap(x => (x.inbounds || []).map(i => i.id));
   if(!ids.length){ toast('还没有节点可导出', true); return; }
   $('#exbox').value = '读取中…';
@@ -1173,6 +1179,43 @@ $('#exportAll').onclick = async () => {
   }catch(err){ $('#exbox').value = '导出失败: ' + err.message; }
 };
 $('#copyall').onclick = () => { const v = $('#exbox').value; if(v) copy(v); };
+
+// SOCKS5 地址是 fanout 自己的能力，不受节点后端限制，xray-cf-lite 模式也能导。
+// 每条后面跟一个 "# 国家码-中文名" 的可读标注。国家码常见的那几个都能认出中文，
+// 冷门的退回英文全名，反正有得认总比没有强。
+const COUNTRY_CN = {
+  'AE':'阿联酋','AL':'阿尔巴尼亚','AR':'阿根廷','AM':'亚美尼亚','AU':'澳大利亚','AT':'奥地利',
+  'AZ':'阿塞拜疆','BD':'孟加拉国','BY':'白俄罗斯','BE':'比利时','BO':'玻利维亚','BA':'波黑',
+  'BR':'巴西','BG':'保加利亚','KH':'柬埔寨','CA':'加拿大','CL':'智利','CN':'中国','CO':'哥伦比亚',
+  'CR':'哥斯达黎加','HR':'克罗地亚','CY':'塞浦路斯','CZ':'捷克','DK':'丹麦','DO':'多米尼加',
+  'EC':'厄瓜多尔','EG':'埃及','SV':'萨尔瓦多','EE':'爱沙尼亚','FI':'芬兰','FR':'法国','GE':'格鲁吉亚',
+  'DE':'德国','GR':'希腊','GT':'危地马拉','HK':'香港','HN':'洪都拉斯','HU':'匈牙利','IS':'冰岛',
+  'IN':'印度','ID':'印尼','IR':'伊朗','IQ':'伊拉克','IE':'爱尔兰','IL':'以色列','IT':'意大利',
+  'JM':'牙买加','JP':'日本','JO':'约旦','KZ':'哈萨克斯坦','KE':'肯尼亚','KR':'韩国','KW':'科威特',
+  'LA':'老挝','LV':'拉脱维亚','LB':'黎巴嫩','LT':'立陶宛','LU':'卢森堡','MO':'澳门','MK':'北马其顿',
+  'MY':'马来西亚','MT':'马耳他','MX':'墨西哥','MD':'摩尔多瓦','MN':'蒙古','ME':'黑山','MA':'摩洛哥',
+  'MM':'缅甸','NP':'尼泊尔','NL':'荷兰','NZ':'新西兰','NI':'尼加拉瓜','NG':'尼日利亚','NO':'挪威',
+  'OM':'阿曼','PK':'巴基斯坦','PA':'巴拿马','PY':'巴拉圭','PE':'秘鲁','PH':'菲律宾','PL':'波兰',
+  'PT':'葡萄牙','PR':'波多黎各','QA':'卡塔尔','RO':'罗马尼亚','RU':'俄罗斯','SA':'沙特','RS':'塞尔维亚',
+  'SG':'新加坡','SK':'斯洛伐克','SI':'斯洛文尼亚','ZA':'南非','ES':'西班牙','LK':'斯里兰卡','SE':'瑞典',
+  'CH':'瑞士','TW':'台湾','TH':'泰国','TT':'特立尼达和多巴哥','TR':'土耳其','UA':'乌克兰','GB':'英国',
+  'UK':'英国','US':'美国','UY':'乌拉圭','UZ':'乌兹别克斯坦','VE':'委内瑞拉','VN':'越南','YE':'也门'
+};
+$('#exportSocks').onclick = () => {
+  $('#extitle').textContent = 'SOCKS5 链接';
+  const lines = [];
+  for(const e of view.exits){
+    if(e.status !== 'up') continue;
+    // 连接地址用母机公网 IP：SOCKS5 监听在母机，出口 IP 只是"出去以后"的地址
+    const cn = COUNTRY_CN[e.region] || e.country || e.region;
+    lines.push(socksURL(credHost(e), e.port, e.socks_user, e.socks_pass)
+      + (e.region ? ' # ' + e.region + '-' + cn : ''));
+  }
+  if(!lines.length){ toast('还没有可导出的出口', true); return; }
+  $('#exbox').value = lines.join('\n');
+  $('#excount').textContent = lines.length + ' 条';
+  openModal('export');
+};
 
 // ---- 设置：改密码 / 改路径 / 改端口 / 改本地监听 ----
 let curSettings = null;

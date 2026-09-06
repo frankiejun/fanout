@@ -160,7 +160,7 @@ if [[ ${#need_cmd[@]} -gt 0 ]]; then
 fi
 
 echo "[2/6] 获取程序"
-REPO="${REPO:-byJoey/fanout}"
+REPO="${REPO:-frankiejun/fanout}"
 ARCH=$(uname -m)
 case "$ARCH" in
   x86_64)  GOARCH=amd64 ;;
