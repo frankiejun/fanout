@@ -128,6 +128,9 @@ label.f>span{display:block;color:var(--dim);font-size:11px;margin-bottom:6px}
 .rg b{font-weight:600;font-size:12px;display:block;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .rg em{display:block;font-style:normal;color:var(--dim);font-size:11px;margin-top:2px}
+.exseg{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--dim)}
+.exseg[hidden]{display:none}
+.exseg label{display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap}
 .stepper{display:flex;align-items:center;gap:0;width:fit-content;
   border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#0e1116}
 .stepper button{border:0;border-radius:0;background:transparent;padding:5px 11px}
@@ -217,7 +220,7 @@ textarea:focus{outline:none;border-color:var(--accent)}
     </button>
     <button id="exportSocks" title="导出所有出口的代理地址（SOCKS5 / HTTP 同端口）">
       <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      导出 SOCKS5
+      导出代理链接
     </button>
     <button id="stopall" title="停止所有出口">
       <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
@@ -419,6 +422,11 @@ textarea:focus{outline:none;border-color:var(--accent)}
       <h2 id="extitle">节点链接</h2>
       <span class="count" id="excount"></span>
       <span class="spacer"></span>
+      <span class="exseg" id="exseg" hidden>
+        <label><input type="radio" name="exproto" value="socks5"> SOCKS5</label>
+        <label><input type="radio" name="exproto" value="http"> HTTP</label>
+        <label><input type="radio" name="exproto" value="all" checked> 全部</label>
+      </span>
       <button id="copyall">
         <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         全部复制
@@ -1180,6 +1188,7 @@ $('#crsave').onclick = async e => {
 // ---- 导出 ----
 $('#exportAll').onclick = async () => {
   $('#extitle').textContent = '节点链接';
+  $('#exseg').hidden = true;
   const ids = view.exits.flatMap(x => (x.inbounds || []).map(i => i.id));
   if(!ids.length){ toast('还没有节点可导出', true); return; }
   $('#exbox').value = '读取中…';
@@ -1215,21 +1224,30 @@ const COUNTRY_CN = {
   'UK':'英国','US':'美国','UY':'乌拉圭','UZ':'乌兹别克斯坦','VE':'委内瑞拉','VN':'越南','YE':'也门'
 };
 $('#exportSocks').onclick = () => {
-  $('#extitle').textContent = '代理链接（SOCKS5 / HTTP 同端口）';
+  $('#extitle').textContent = '导出代理链接';
+  $('#exseg').hidden = false;
+  renderProxyLinks();
+};
+function renderProxyLinks(){
+  const proto = (document.querySelector('input[name=exproto]:checked') || {}).value || 'all';
   const lines = [];
   for(const e of view.exits){
     if(e.status !== 'up') continue;
     // 连接地址用母机公网 IP：代理监听在母机，出口 IP 只是"出去以后"的地址
     const cn = COUNTRY_CN[e.region] || e.country || e.region;
     const tag = e.region ? ' # ' + e.region + '-' + cn : '';
-    lines.push(socksURL(credHost(e), e.port, e.socks_user, e.socks_pass) + tag);
-    lines.push(httpProxyURL(credHost(e), e.port, e.socks_user, e.socks_pass) + tag);
+    if(proto === 'socks5' || proto === 'all')
+      lines.push(socksURL(credHost(e), e.port, e.socks_user, e.socks_pass) + tag);
+    if(proto === 'http' || proto === 'all')
+      lines.push(httpProxyURL(credHost(e), e.port, e.socks_user, e.socks_pass) + tag);
   }
   if(!lines.length){ toast('还没有可导出的出口', true); return; }
   $('#exbox').value = lines.join('\n');
   $('#excount').textContent = lines.length + ' 条';
   openModal('export');
 };
+document.querySelectorAll('input[name=exproto]').forEach(r =>
+  r.onchange = () => { if($('#export').classList.contains('open')) renderProxyLinks(); });
 
 // ---- 设置：改密码 / 改路径 / 改端口 / 改本地监听 ----
 let curSettings = null;
