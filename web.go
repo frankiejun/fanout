@@ -698,12 +698,15 @@ document.querySelectorAll('.modal').forEach(m => {
 
 function renderRegions(){
   const kw = $('#rgfilter').value.trim().toLowerCase();
+  const cnOf = r => COUNTRY_CN[r.code] || r.name;
   const list = regions.filter(r => !kw
-    || r.code.toLowerCase().includes(kw) || r.name.toLowerCase().includes(kw));
+    || r.code.toLowerCase().includes(kw) || r.name.toLowerCase().includes(kw)
+    || cnOf(r).toLowerCase().includes(kw));
   $('#regions').innerHTML = ['<button class="rg' + (region === '' ? ' sel' : '')
       + '" data-rg=""><b>不限地区</b><em>速度优先</em></button>']
     .concat(list.map(r => '<button class="rg' + (region === r.code ? ' sel' : '')
-      + '" data-rg="' + esc(r.code) + '"><b>' + esc(r.code) + ' ' + esc(r.name) + '</b>'
+      + '" data-rg="' + esc(r.code) + '"><b>' + flag(r.code) + ' ' + esc(r.code)
+      + ' ' + esc(cnOf(r)) + '</b>'
       + '<em>' + r.available + ' 个空闲 · ' + r.best_speed_mbps.toFixed(0) + ' Mbps</em></button>'))
     .join('');
   updateAvail();
