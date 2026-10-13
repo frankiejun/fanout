@@ -218,7 +218,7 @@ textarea:focus{outline:none;border-color:var(--accent)}
       <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       导出链接
     </button>
-    <button id="exportSocks" title="导出所有出口的 SOCKS5 代理地址">
+    <button id="exportSocks" title="导出所有出口的代理地址（SOCKS5 / HTTP 同端口）">
       <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       导出 SOCKS5
     </button>
@@ -382,7 +382,7 @@ textarea:focus{outline:none;border-color:var(--accent)}
 <div class="modal" id="credbox">
   <div class="sheet">
     <div class="head">
-      <h2>SOCKS5 访问凭据</h2>
+      <h2>代理访问凭据</h2>
       <span class="count" id="crtitle"></span>
       <span class="spacer"></span>
       <button class="icon" data-close="credbox" title="关闭">
@@ -391,6 +391,7 @@ textarea:focus{outline:none;border-color:var(--accent)}
     </div>
     <div class="body">
       <div class="share" id="crurl"></div>
+      <div class="share" id="crurlhttp" title="只认 HTTP 代理的客户端用这个（HTTPS 走 CONNECT 透传）"></div>
       <div class="credrow">
         <label class="ef"><span>用户名</span>
           <input id="cruser" type="text" spellcheck="false"></label>
@@ -590,7 +591,7 @@ function renderExits(){
       +   '<span class="ip">' + esc(label) + '</span>'
       +   '<span class="meta">' + place + ' · ' + esc(e.host) + '</span>'
       +   '<span class="chips">' + chips + '</span>'
-      +   '<span class="socks"><button data-cred="' + e.slot + '" title="SOCKS5 访问凭据">'
+      +   '<span class="socks"><button data-cred="' + e.slot + '" title="代理访问凭据（SOCKS5 / HTTP 同端口）">'
       +     ICON.lock + ':' + e.port + '</button></span>'
       +   '<span class="acts">'
       +     '<button class="icon" data-swap="' + e.slot + '" title="换一个节点">' + ICON.redo + '</button>'
@@ -1107,6 +1108,12 @@ function socksURL(host, port, user, pass){
   return 'socks5://' + user + ':' + pass + '@' + host + ':' + port;
 }
 
+// 同一端口也接受 HTTP CONNECT，拼法只是 scheme 换成 http。
+function httpProxyURL(host, port, user, pass){
+  if(!user) return 'http://' + host + ':' + port;
+  return 'http://' + user + ':' + pass + '@' + host + ':' + port;
+}
+
 // SOCKS5 端口监听在母机（跑 fanout 的这台服务器）上，客户端要连的是母机的
 // 公网 IPv4，流量再从出口 IP 出去。出口 IP 是"出去以后"的地址，不能当连接地址。
 // public_ip 是后端探测到的母机公网地址；探测不到才退回访问面板用的主机名。
@@ -1127,8 +1134,9 @@ function openCred(slot){
 
 function refreshCredURL(){
   if(!curCred) return;
-  $('#crurl').textContent = socksURL(curCred.host, curCred.port,
-    $('#cruser').value.trim(), $('#crpass').value.trim());
+  const u = $('#cruser').value.trim(), p = $('#crpass').value.trim();
+  $('#crurl').textContent = socksURL(curCred.host, curCred.port, u, p);
+  $('#crurlhttp').textContent = httpProxyURL(curCred.host, curCred.port, u, p);
 }
 $('#cruser').oninput = refreshCredURL;
 $('#crpass').oninput = refreshCredURL;
@@ -1143,7 +1151,7 @@ $('#crrand').onclick = () => {
   refreshCredURL();
 };
 
-$('#crcopy').onclick = () => { copy($('#crurl').textContent); };
+$('#crcopy').onclick = () => { copy($('#crurl').textContent + '\n' + $('#crurlhttp').textContent); };
 
 $('#crsave').onclick = async e => {
   if(!curCred) return;
@@ -1202,14 +1210,15 @@ const COUNTRY_CN = {
   'UK':'英国','US':'美国','UY':'乌拉圭','UZ':'乌兹别克斯坦','VE':'委内瑞拉','VN':'越南','YE':'也门'
 };
 $('#exportSocks').onclick = () => {
-  $('#extitle').textContent = 'SOCKS5 链接';
+  $('#extitle').textContent = '代理链接（SOCKS5 / HTTP 同端口）';
   const lines = [];
   for(const e of view.exits){
     if(e.status !== 'up') continue;
-    // 连接地址用母机公网 IP：SOCKS5 监听在母机，出口 IP 只是"出去以后"的地址
+    // 连接地址用母机公网 IP：代理监听在母机，出口 IP 只是"出去以后"的地址
     const cn = COUNTRY_CN[e.region] || e.country || e.region;
-    lines.push(socksURL(credHost(e), e.port, e.socks_user, e.socks_pass)
-      + (e.region ? ' # ' + e.region + '-' + cn : ''));
+    const tag = e.region ? ' # ' + e.region + '-' + cn : '';
+    lines.push(socksURL(credHost(e), e.port, e.socks_user, e.socks_pass) + tag);
+    lines.push(httpProxyURL(credHost(e), e.port, e.socks_user, e.socks_pass) + tag);
   }
   if(!lines.length){ toast('还没有可导出的出口', true); return; }
   $('#exbox').value = lines.join('\n');

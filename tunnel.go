@@ -181,7 +181,7 @@ func (t *Tunnel) startOpenVPN(dir string) error {
 	return fmt.Errorf("等待 tun0 就绪超时，详见 %s", logPath)
 }
 
-// serve 在母机上监听 SOCKS5 端口，出站连接则在 netns 内建立。
+// serve 在母机上监听代理端口（SOCKS5 与 HTTP CONNECT 同端口），出站连接则在 netns 内建立。
 // 监听必须留在母机侧：netns 内的 loopback 与母机彼此独立，
 // 监听在 netns 里的话外部根本连不上。
 func (t *Tunnel) serve() error {
@@ -219,7 +219,7 @@ func (t *Tunnel) serve() error {
 			}
 			// 每次连接现取凭据：改口令后不必重建监听，新连接立刻按新凭据校验
 			cred := t.credential()
-			go serveSocks(conn, &cred, dial)
+			go serveMixed(conn, &cred, dial)
 		}
 	}()
 	return nil

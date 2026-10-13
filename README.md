@@ -2,8 +2,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-把 VPN Gate 的公共节点变成本地 SOCKS5 端口：一个端口一个出口 IP。
+把 VPN Gate 的公共节点变成代理端口：一个端口一个出口 IP。
 再给每个出口挂一个节点链接，客户端连哪个端口就从哪个国家出去。
+
+每个端口同时是 SOCKS5 和 HTTP 代理（只认 HTTP 的浏览器填 `http://` 的就行，
+HTTPS 走 CONNECT 透传）。
 
 节点链接有三种管法：同机装了 3x-ui 或 xray-cf-lite 就接管它们的入站，
 都没装则 fanout 自己跑 Xray，建站、改站、发链接都在同一个界面里完成。
@@ -17,13 +20,13 @@
 ## 原理
 
 每个节点跑在独立的 network namespace 里，netns 内启动官方 openvpn 客户端。
-SOCKS5 监听在母机，出站连接用 `setns` 切进对应 netns 建立。
+代理端口监听在母机，出站连接用 `setns` 切进对应 netns 建立。
 
 这样做的好处：VPN 的路由劫持只影响自己的 netns，不会切断母机的网络；
 多个节点互不干扰，各自一个出口 IP。
 
 ```
-客户端 ──> 母机 SOCKS5 :随机端口 ──> netns foN ──> openvpn ──> VPN Gate 节点
+客户端 ──> 母机代理 :随机端口 ──> netns foN ──> openvpn ──> VPN Gate 节点
 ```
 
 ## 安装
@@ -155,7 +158,9 @@ netns 仍能经母机 NAT 出网，只看通不通会漏判。连续两次不符
 
 ## 已知限制
 
-- 只转发 TCP。SOCKS5 收到域名时在本机解析，隧道内不跑 UDP/DNS。
+- 只转发 TCP。收到域名时在本机解析，隧道内不跑 UDP/DNS（SOCKS5 的 UDP ASSOCIATE 例外，见下）。
+- HTTP 代理只做 CONNECT 透传（HTTPS），明文 `GET http://` 转发不支持。
+- SOCKS5 支持 UDP ASSOCIATE：hysteria2 这类把 DNS/QUIC 走 UDP 的客户端可用。
 - VPN Gate 是志愿者节点，有相当比例已下线或满员（`AUTH_FAILED`）。
   启动时连不上会自动顺着同地区候选往下试，最多 6 个。
 - 管理界面只有随机路径 + 口令登录，没有 HTTPS。放公网建议前面套一层反代。
