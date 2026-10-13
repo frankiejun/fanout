@@ -509,6 +509,12 @@ async function api(path, opts){
 }
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// 国家码转国旗 emoji（如 KR → 🇰🇷），非标准码返回空
+function flag(code){
+  code = String(code || '').toUpperCase();
+  if(!/^[A-Z]{2}$/.test(code)) return '';
+  return String.fromCodePoint(...[...code].map(c => 127397 + c.charCodeAt(0)));
+}
 
 let toastTimer;
 function toast(msg, bad){
@@ -579,9 +585,11 @@ function renderExits(){
       : '<span class="chip none">无节点</span>';
     const err = e.status === 'failed' && e.err
       ? '<div class="errline" title="' + esc(e.err) + '">' + esc(e.err) + '</div>' : '';
-    // 国家码和全名一起显示是冗余的，只在两者确实不同时才补全名
-    const place = e.country && e.country.toUpperCase() !== (e.region || '').toUpperCase()
-      ? esc(e.region) + ' ' + esc(e.country) : esc(e.region || '—');
+    // 国旗 + 国家码 + 中文名，如 🇰🇷 KR 韩国；冷门码退回英文全名
+    const cn = COUNTRY_CN[e.region] || e.country || e.region || '—';
+    const place = e.region
+      ? flag(e.region) + ' ' + esc(e.region) + ' ' + esc(cn)
+      : esc(cn);
     return '<div class="exit">'
       + '<div class="row">'
       +   '<span class="dot ' + e.status + '" title="' + (STATUS[e.status] || e.status) + '"></span>'
