@@ -173,10 +173,6 @@ netns 仍能经母机 NAT 出网，只看通不通会漏判。连续两次不符
 本工具只是调用其公开的节点列表并用官方 openvpn 客户端连接，不修改也不代理其服务。
 使用时请遵守 VPN Gate 的条款和你所在地的法律。
 
-## 交流
+## 致谢
 
-- 交流群：<https://t.me/+ft-zI76oovgwNmRh>
-- 视频教程：<https://youtube.com/@joeyblog>
-- 博客：<https://joeyblog.net>
-
-用着有问题、或者想要什么功能，去群里说或提 issue。
+感谢原项目 [byJoey/fanout](https://github.com/byJoey/fanout)。
